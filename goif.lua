@@ -30,9 +30,7 @@ if love.system.getOS() == "Windows" then
   end
 elseif love.system.getOS() == "Linux" then
   libname = 'libgoif.so'
-  if path == '' then
-    path = './'
-  end
+  path = './'
 end
 
 local lib = package.loadlib(path .. libname, 'luaopen_libgoif')
@@ -47,13 +45,15 @@ local function unbind()
   love.graphics.setCanvas()
 end
 
-goif.start = function()
+goif.start = function(width, height)
+  width = width or love.graphics.getWidth()
+  height = height or love.graphics.getHeght()
   goif.frame = 0
   goif.data = {}
   goif.active = true
   if goif.canvas == nil then
-    goif.width = love.graphics.getWidth()
-    goif.height = love.graphics.getHeight()
+    goif.width = width
+    goif.height = height
     goif.canvas = love.graphics.newCanvas(goif.width, goif.height)
   end
 end
