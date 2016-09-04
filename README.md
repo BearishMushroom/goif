@@ -38,6 +38,11 @@ Use this if your rendering uses `Cavnas`'s.
 
 Submit the `Canvas` of your finished scene and goif will add it to the gif.
 
+## Warning!
+While recording, goif can use insane amounts of memory! This is all cleaned up after export, though.
+
+Also, please note that exporting can take a few seconds and will stall the game.
+
 # Example
 Captures a gif of a rectangle moving right, printing info as it saves.
 
