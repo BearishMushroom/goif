@@ -440,8 +440,11 @@ typedef struct writer_t {
 
 int begin(writer* writer, char* filename, unsigned int width, unsigned int height, unsigned int delay, int depth) {
 	writer->f = 0;
-	fopen_s(&writer->f, filename, "wb");
-
+#ifdef _WIN32
+    fopen_s(&writer->f, filename, "wb");
+#else
+    writer->f = fopen(filename, "wb");
+#endif
 	if (depth == 0) depth = 8;
 
 	if (!writer->f) return 0;
@@ -562,7 +565,11 @@ static luaL_reg lib[] = {
 	{NULL, NULL}
 };
 
-int __declspec(dllexport) luaopen_libgoif(lua_State* L) {
+int 
+#ifdef _WIN32
+__declspec(dllexport)
+#endif
+luaopen_libgoif(lua_State* L) {
 	luaL_openlib(L, "goif", lib, 0);
 	return 1;
 }
