@@ -47,7 +47,7 @@ end
 
 goif.start = function(width, height)
   width = width or love.graphics.getWidth()
-  height = height or love.graphics.getHeght()
+  height = height or love.graphics.getHeight()
   goif.frame = 0
   goif.data = {}
   goif.active = true
