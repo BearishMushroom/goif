@@ -1,5 +1,4 @@
 #include <lauxlib.h>
-
 #include <malloc.h>
 #include <string.h>
 
@@ -29,6 +28,8 @@ void push_frame(void* data, unsigned long size) {
 	current_frame++;
 }
 
+int trans_index = 0;
+
 typedef struct palette_t {
 	int depth;
 
@@ -40,21 +41,19 @@ typedef struct palette_t {
 	unsigned char split[255];
 } palette;
 
-int max(int a, int b) { return a > b ? a : b; }
-int min(int a, int b) { return a < b ? a : b; }
-int _abs(int a) { return a < 0 ? -a : a; }
+int _max(int l, int r) { return l > r ?  l : r; }
+int _min(int l, int r) { return l < r ?  l : r; }
+int _abs(int i)        { return i < 0 ? -i : i; }
 
-static int trans_index = 0;
 
-void closest_palette(palette* pal, int r, int g, int b, int* best_ind, int* best_diff, int tree_root) {
-	if (tree_root > (1 << pal->depth) - 1) {
-		int ind = tree_root - (1 << pal->depth);
+void closest_palette(palette* pal, int red, int green, int blue, int* best_ind, int* best_diff, int root) {
+	if (root > (1 << pal->depth) - 1) {
+		int ind = root - (1 << pal->depth);
 		if (ind == trans_index) return;
 
-
-		int r_err = r - (int)pal->red[ind];
-		int g_err = g - (int)pal->green[ind];
-		int b_err = b - (int)pal->blue[ind];
+		int r_err = red - ((int)pal->red[ind]);
+		int g_err = green - ((int)pal->green[ind]);
+		int b_err = blue - ((int)pal->blue[ind]);
 		int diff = _abs(r_err) + _abs(g_err) + _abs(b_err);
 
 		if (diff < *best_diff) {
@@ -66,25 +65,22 @@ void closest_palette(palette* pal, int r, int g, int b, int* best_ind, int* best
 	}
 
 	int comps[3]; 
-	comps[0] = r; 
-	comps[1] = g; 
-	comps[2] = b;
+	comps[0] = red; 
+	comps[1] = green; 
+	comps[2] = blue;
 	
-	int comp = comps[pal->split_elt[tree_root]];
+	int comp = comps[pal->split_elt[root]];
 
-	int pos = pal->split[tree_root];
-
+	int pos = pal->split[root];
 	if (pos > comp) {
-		closest_palette(pal, r, g, b, best_ind, best_diff, tree_root * 2);
-
+		closest_palette(pal, red, green, blue, best_ind, best_diff, root * 2);
 		if (*best_diff > pos - comp) {
-			closest_palette(pal, r, g, b, best_ind, best_diff, tree_root * 2 + 1);
+			closest_palette(pal, red, green, blue, best_ind, best_diff, root * 2 + 1);
 		}
 	} else {
-		closest_palette(pal, r, g, b, best_ind, best_diff, tree_root * 2 + 1);
-
+		closest_palette(pal, red, green, blue, best_ind, best_diff, root * 2 + 1);
 		if (*best_diff > comp - pos) {
-			closest_palette(pal, r, g, b, best_ind, best_diff, tree_root * 2);
+			closest_palette(pal, red, green, blue, best_ind, best_diff, root * 2);
 		}
 	}
 }
@@ -112,52 +108,52 @@ void swap(unsigned char* image, int a, int b) {
 }
 
 int partition(unsigned char* image, int left, int right, int elt, int pivot_index) {
-	int value = image[(pivot_index) * 4 + elt];
+	int value = image[pivot_index * 4 + elt];
 	swap(image, pivot_index, right - 1);
 	int index = left;
 	int split = 0;
-	for (int i = left; i < right - 1; i++) {
+	for (int i = left; i < right - 1; i++)
+	{
 		int val = image[i * 4 + elt];
-		if (val < value) {
+		if (val < value)
+		{
 			swap(image, i, index);
 			index++;
-		}
-		else if (val == value) {
+		} else if (val == value) {
 			if (split) {
 				swap(image, i, index);
 				index++;
 			}
 
-			split = !split;
+			split = split == 0 ? 1 : 0;
 		}
 	}
-
 	swap(image, index, right - 1);
 	return index;
 }
 
 void median(unsigned char* image, int left, int right, int com, int center) {
 	if (left < right - 1) {
-		int pivot_index = left + (right - left) / 2;
+		int index = left + (right - left) / 2;
 
-		pivot_index = partition(image, left, right, com, pivot_index);
+		index = partition(image, left, right, com, index);
 
-		if (pivot_index > center) {
-			median(image, left, pivot_index, com, center);
+		if (index > center) {
+			median(image, left, index, com, center);
 		}
 
-		if (pivot_index < center) {
-			median(image, pivot_index + 1, right, com, center);
+		if (index < center) {
+			median(image, index + 1, right, com, center);
 		}
 	}
 }
 
-void split(unsigned char* image, int num_pixels, int first_elt, int last_elt, int split_elt, int split_dist, int tree_node, palette* pal)
-{
-	if (last_elt <= first_elt || num_pixels == 0)
+void split(unsigned char* image, int num_pixels, int first, int last, int split_pos, int dist, int node, palette* pal) {
+	if (last <= first || num_pixels == 0) {
 		return;
+	}
 
-	if (last_elt == first_elt + 1) {
+	if (last == first + 1) {
 		unsigned long long r = 0, g = 0, b = 0;
 		for (int i = 0; i < num_pixels; i++) {
 			r += image[i * 4 + 0];
@@ -165,7 +161,7 @@ void split(unsigned char* image, int num_pixels, int first_elt, int last_elt, in
 			b += image[i * 4 + 2];
 		}
 
-		r += num_pixels / 2;  // round to nearest
+		r += num_pixels / 2; 
 		g += num_pixels / 2;
 		b += num_pixels / 2;
 
@@ -173,17 +169,17 @@ void split(unsigned char* image, int num_pixels, int first_elt, int last_elt, in
 		g /= num_pixels;
 		b /= num_pixels;
 
-		pal->red[first_elt] = (unsigned char)r;
-		pal->green[first_elt] = (unsigned char)g;
-		pal->blue[first_elt] = (unsigned char)b;
+		pal->red[first] = (unsigned char)r;
+		pal->green[first] = (unsigned char)g;
+		pal->blue[first] = (unsigned char)b;
 
 		return;
 	}
 
-	// Find the axis with the largest range
 	int min_r = 255, max_r = 0;
 	int min_g = 255, max_g = 0;
 	int min_b = 255, max_b = 0;
+	
 	for (int i = 0; i < num_pixels; i++) {
 		int r = image[i * 4 + 0];
 		int g = image[i * 4 + 1];
@@ -203,29 +199,29 @@ void split(unsigned char* image, int num_pixels, int first_elt, int last_elt, in
 	int g_range = max_g - min_g;
 	int b_range = max_b - min_b;
 
-	int split_com = 1;
-	if (b_range > g_range) split_com = 2;
-	if (r_range > b_range && r_range > g_range) split_com = 0;
+	int com = 1;
+	if (b_range > g_range) com = 2;
+	if (r_range > b_range && r_range > g_range) com = 0;
 
-	int sub_a = num_pixels * (split_elt - first_elt) / (last_elt - first_elt);
+	int sub_a = num_pixels * (split_pos - first) / (last - first);
 	int sub_b = num_pixels - sub_a;
 
-	median(image, 0, num_pixels, split_com, sub_a);
+	median(image, 0, num_pixels, com, sub_a);
 
-	pal->split_elt[tree_node] = split_com;
-	pal->split[tree_node] = image[sub_a * 4 + split_com];
+	pal->split_elt[node] = com;
+	pal->split[node] = image[sub_a * 4 + com];
 
-	split(image, sub_a, first_elt, split_elt, split_elt - split_dist, split_dist / 2, tree_node * 2, pal);
-	split(image + sub_a * 4, sub_b, split_elt, last_elt, split_elt + split_dist, split_dist / 2, tree_node * 2 + 1, pal);
+	split(image, sub_a, first, split_pos, split_pos - dist, dist / 2, node * 2, pal);
+	split(image + sub_a * 4, sub_b, split_pos, last, split_pos + dist, dist / 2, node * 2 + 1, pal);
 }
 
-int changed(unsigned char* last_frame, unsigned char* frame, int num_pixels) {
+int pick_changed(unsigned char* last, unsigned char* frame, int num_pixels) {
 	int num_changed = 0;
 	unsigned char* write_iter = frame;
 
 	for (int i = 0; i < num_pixels; i++) {
-		if (last_frame[0] != frame[0] || last_frame[1] != frame[1] ||
-				last_frame[2] != frame[2]) {
+		if (last[0] != frame[0] || last[1] != frame[1] ||
+				last[2] != frame[2]) {
 			write_iter[0] = frame[0];
 			write_iter[1] = frame[1];
 			write_iter[2] = frame[2];
@@ -233,64 +229,62 @@ int changed(unsigned char* last_frame, unsigned char* frame, int num_pixels) {
 			write_iter += 4;
 		}
 
-		last_frame += 4;
+		last += 4;
 		frame += 4;
 	}
 
 	return num_changed;
 }
 
-void make_palette(unsigned char* last_trame, unsigned char* next_frame, unsigned int width, unsigned int height, int depth, palette* pal) {
+void make_palette(unsigned char* last, unsigned char* next, unsigned int width, unsigned int height, int depth, palette* pal) {
 	pal->depth = depth;
 
 	int size = width * height * 4 * sizeof(unsigned char);
 	unsigned char* image = (unsigned char*)malloc(size);
-	memcpy(image, next_frame, size);
+	memcpy(image, next, size);
 
 	int num_pixels = width * height;
-	if (last_trame) {
-		num_pixels = changed(last_trame, image, num_pixels);
+	if (last) {
+		num_pixels = pick_changed(last, image, num_pixels);
 	}
 
 	int last_elt = 1 << depth;
 	int split_elt = last_elt / 2;
-	int split_dist = split_elt / 2;
+	int dist = split_elt / 2;
 
-	split(image, num_pixels, 1, last_elt, split_elt, split_dist, 1, pal);
+	split(image, num_pixels, 1, last_elt, split_elt, dist, 1, pal);
 
 	free(image);
 
 	pal->split[1 << (depth - 1)] = 0;
 	pal->split_elt[1 << (depth - 1)] = 0;
 
-	pal->red[0] = 
-	pal->green[0] = 
-	pal->blue[0] = 0;
+	pal->red[0] = pal->green[0] = pal->blue[0] = 0;
 }
 
-void threshold(unsigned char* last_frame, unsigned char* next_frame, unsigned char* out_frame, unsigned int width, unsigned int height, palette* pal) {
+void threshold(unsigned char* last, unsigned char* next, unsigned char* out, unsigned int width, unsigned int height, palette* pal) {
 	unsigned int num_pixels = width * height;
 	for (unsigned int i = 0; i < num_pixels; i++) {
-		if (last_frame && last_frame[0] == next_frame[0] &&
-				last_frame[1] == next_frame[1] && last_frame[2] == next_frame[2]) {
-			out_frame[0] = last_frame[0];
-			out_frame[1] = last_frame[1];
-			out_frame[2] = last_frame[2];
-			out_frame[3] = trans_index;
+		if (last && last[0] == next[0] &&
+				last[1] == next[1] && last[2] == next[2]) {
+			out[0] = last[0];
+			out[1] = last[1];
+			out[2] = last[2];
+			out[3] = trans_index;
 		} else {
 			int best_diff = 1000000;
 			int best_ind = 1;
-			closest_palette(pal, next_frame[0], next_frame[1], next_frame[2], &best_ind, &best_diff, 1);
+			closest_palette(pal, next[0], next[1], next[2], &best_ind, &best_diff, 1);
 
-			out_frame[0] = pal->red[best_ind];
-			out_frame[1] = pal->green[best_ind];
-			out_frame[2] = pal->blue[best_ind];
-			out_frame[3] = best_ind;
+			out[0] = pal->red[best_ind];
+			out[1] = pal->green[best_ind];
+			out[2] = pal->blue[best_ind];
+			out[3] = best_ind;
 		}
 
-		if (last_frame) last_frame += 4;
-		out_frame += 4;
-		next_frame += 4;
+		if (last) last += 4;
+		out += 4;
+		next += 4;
 	}
 }
 
@@ -307,7 +301,7 @@ void write_bit(bit_buffer* buffer, unsigned int bit) {
 	bit = bit << buffer->bit;
 	buffer->byte |= bit;
 
-	++buffer->bit;
+	buffer->bit++;
 	if (buffer->bit > 7) {
 		buffer->buffer[buffer->index++] = buffer->byte;
 		buffer->bit = 0;
@@ -335,12 +329,12 @@ void write_code(FILE* f, bit_buffer* buffer, unsigned int code, unsigned int len
 	}
 }
 
-typedef struct lzw_node_t {
+typedef struct lzw_package_t {
 	unsigned short blocks[256];
-} lzw_node;
+} lzw_package;
 
 void write_palette(palette* pal, FILE* f) {
-	fputc(0, f);  // transparency
+	fputc(0, f); 
 	fputc(0, f);
 	fputc(0, f);
 
@@ -356,168 +350,169 @@ void write_palette(palette* pal, FILE* f) {
 }
 
 void write_lzw(FILE* f, unsigned char* image, unsigned int left, unsigned int top, unsigned int width, unsigned int height, unsigned int delay, palette* pal) {
-	fputc(0x21, f); fputc(0xf9, f);
-	fputc(0x04, f); fputc(0x05, f);
-
+	fputc(0x21, f);
+	fputc(0xf9, f);
+	fputc(0x04, f);
+	fputc(0x05, f);
 	fputc(delay & 0xff, f);
 	fputc((delay >> 8) & 0xff, f);
-	
-	fputc(trans_index, f); // transparent color index
-	
-	fputc(0, f); fputc(0x2c, f);
+	fputc(trans_index, f);
+	fputc(0, f);
+	fputc(0x2c, f);
 	fputc(left & 0xff, f);
 	fputc((left >> 8) & 0xff, f);
 	fputc(top & 0xff, f);
 	fputc((top >> 8) & 0xff, f);
-
 	fputc(width & 0xff, f);
 	fputc((width >> 8) & 0xff, f);
 	fputc(height & 0xff, f);
 	fputc((height >> 8) & 0xff, f);
-
 	fputc(0x80 + pal->depth - 1, f);
 	write_palette(pal, f);
 
 	int min_size = pal->depth;
-	unsigned int clear_code = 1 << pal->depth;
+	unsigned int clear = 1 << pal->depth;
 
-	fputc(min_size, f); // min code size 8 bits
+	fputc(min_size, f);
 
-	lzw_node* code_tree = (lzw_node*)malloc(sizeof(lzw_node) * 4096);
+	lzw_package* package = (lzw_package*)malloc(sizeof(lzw_package) * 4096);
 
-	memset(code_tree, 0, sizeof(lzw_node) * 4096);
-	int cur_code = -1;
-	unsigned int code_size = min_size + 1;
-	unsigned int max_code = clear_code + 1;
+	memset(package, 0, sizeof(lzw_package) * 4096);
+	int current = -1;
+	unsigned int size = min_size + 1;
+	unsigned int code = clear + 1;
 
 	bit_buffer buffer;
 	buffer.byte = 0;
 	buffer.bit = 0;
 	buffer.index = 0;
 
-	write_code(f, &buffer, clear_code, code_size);
+	write_code(f, &buffer, clear, size);
 
-	for (unsigned int y = 0; y < height; y++) {
-		for (unsigned int x = 0; x < width; x++) {
-			unsigned char next_value = image[(y*width + x) * 4 + 3];
+	for (unsigned int yy = 0; yy < height; yy++) {
+		for (unsigned int xx = 0; xx < width; xx++) {
+			unsigned char next_value = image[(yy * width + xx) * 4 + 3];
 
-			if (cur_code < 0) {
-				cur_code = next_value;
-			} else if (code_tree[cur_code].blocks[next_value]) {
-				cur_code = code_tree[cur_code].blocks[next_value];
+			if (current < 0) {
+				current = next_value;
+			}
+			else if (package[current].blocks[next_value]) {
+				current = package[current].blocks[next_value];
 			} else {
-				write_code(f, &buffer, cur_code, code_size);
+				write_code(f, &buffer, current, size);
+				package[current].blocks[next_value] = ++code;
 
-				code_tree[cur_code].blocks[next_value] = max_code++;
-
-				if (max_code >= (1ul << code_size)) {
-					code_size++;
+				if (code >= (1ul << size)) {
+					size++;
 				}
 
-				if (max_code == 4095) {
-					write_code(f, &buffer, clear_code, code_size);
+				if (code == 4095) {
+					write_code(f, &buffer, clear, size);
 
-					memset(code_tree, 0, sizeof(lzw_node) * 4096);
-					cur_code = -1;
-					code_size = min_size + 1;
-					max_code = clear_code + 1;
+					memset(package, 0, sizeof(lzw_package) * 4096);
+					current = -1;
+					size = min_size + 1;
+					code = clear + 1;
 				}
 
-				cur_code = next_value;
+				current = next_value;
 			}
 		}
 	}
 
-	write_code(f, &buffer, cur_code, code_size);
-	write_code(f, &buffer, clear_code, code_size);
-	write_code(f, &buffer, clear_code + 1, min_size + 1);
+	write_code(f, &buffer, current, size);
+	write_code(f, &buffer, clear, size);
+	write_code(f, &buffer, clear + 1, min_size + 1);
 
 	while (buffer.bit) write_bit(&buffer, 0);
 	if (buffer.index) write_chunk(f, &buffer);
 
-	fputc(0, f); // image block terminator
+	fputc(0, f);
 
-	free(code_tree);
+	free(package);
 }
 
 typedef struct writer_t {
-	FILE* file;
-	unsigned char* image;
+	FILE* f;
+	unsigned char* old;
 	int first;
 } writer;
 
-int begin(writer* writer, const char* file_name, unsigned int width, unsigned int height, unsigned int delay, int depth) {
-	writer->file = 0;
-	fopen_s(&writer->file, file_name, "wb");
+int begin(writer* writer, char* filename, unsigned int width, unsigned int height, unsigned int delay, int depth) {
+	writer->f = 0;
+	fopen_s(&writer->f, filename, "wb");
 
-	if (!writer->file) return 0;
+	if (depth == 0) depth = 8;
+
+	if (!writer->f) return 0;
 
 	writer->first = 1;
 
-	writer->image = (unsigned char*)malloc(width * height * 4);
+	writer->old = (unsigned char*)malloc(width * height * 4);
 
-	fputs("GIF89a", writer->file);
+	fputs("GIF89a", writer->f);
 
-	fputc(width & 0xff, writer->file);
-	fputc((width >> 8) & 0xff, writer->file);
-	fputc(height & 0xff, writer->file);
-	fputc((height >> 8) & 0xff, writer->file);
+	fputc(width & 0xff, writer->f);
+	fputc((width >> 8) & 0xff, writer->f);
+	fputc(height & 0xff, writer->f);
+	fputc((height >> 8) & 0xff, writer->f);
 
-	fputc(0xf0, writer->file);
+	fputc(0xf0, writer->f);  
+	fputc(0, writer->f);     
+	fputc(0, writer->f);     
+	fputc(0, writer->f);
+	fputc(0, writer->f);
+	fputc(0, writer->f);
+	fputc(0, writer->f);
+	fputc(0, writer->f);
+	fputc(0, writer->f);
 
-	fputc(0, writer->file); 
-	fputc(0, writer->file); 
-	fputc(0, writer->file);
-	fputc(0, writer->file);
-	fputc(0, writer->file);
-	fputc(0, writer->file);
-	fputc(0, writer->file);
-	fputc(0, writer->file);
-
-	fputc(0x21, writer->file);
-	fputc(0xff, writer->file);
-	fputc(11, writer->file);
-	fputs("NETSCAPE2.0", writer->file);
-	fputc(3, writer->file);
-
-	fputc(1, writer->file);
-	fputc(0, writer->file);
-	fputc(0, writer->file);
-	fputc(0, writer->file);
+	fputc(0x21, writer->f);
+	fputc(0xff, writer->f);
+	fputc(11, writer->f);
+	fputs("NETSCAPE2.0", writer->f);
+	fputc(3, writer->f);
+	fputc(1, writer->f);
+	fputc(0, writer->f);
+	fputc(0, writer->f);
+	fputc(0, writer->f);
 
 	return 1;
 }
 
-int frame(writer* writer, unsigned char* image, unsigned int width, unsigned int height, unsigned int delay, int depth) {
-	if (!writer->file) return 0;
+int frame(writer* writer, unsigned char* image, unsigned int width, unsigned int height, unsigned int delay, int depth){
+	if (!writer->f) return 0;
+	if (depth == 0) depth = 8;
 
-	unsigned char* old_image = writer->first ? NULL : writer->image;
+	unsigned char* oldImage = writer->first ? NULL : writer->old;
 	writer->first = 0;
 
 	palette pal;
-	make_palette(old_image, image, width, height, depth, &pal);
-	threshold(old_image, image, writer->image, width, height, &pal);
-	write_lzw(writer->file, writer->image, 0, 0, width, height, delay, &pal);
+	make_palette(oldImage, image, width, height, depth, &pal);
+
+	threshold(oldImage, image, writer->old, width, height, &pal);
+
+	write_lzw(writer->f, writer->old, 0, 0, width, height, delay, &pal);
 
 	return 1;
 }
 
 int end(writer* writer) {
-	if (!writer->file) return 0;
+	if (!writer->f) return 0;
 
-	fputc(0x3b, writer->file); // end of file
-	fclose(writer->file);
-	free(writer->image);
+	fputc(0x3b, writer->f);
+	fclose(writer->f);
+	free(writer->old);
 
-	writer->file = 0;
-	writer->image = 0;
+	writer->f = NULL;
+	writer->old = NULL;
 
 	return 1;
 }
 
 void save(char* path, int verbose) {
 	if(verbose) printf("GIF_START\n");
-	
+
 	writer writer;
 	begin(&writer, path, width, height, 2, 8);
 	
@@ -527,6 +522,7 @@ void save(char* path, int verbose) {
 	}
 	
 	end(&writer);
+
 	free(frames);
 	free(sizes);
 
@@ -559,7 +555,7 @@ int l_save(lua_State* L) {
 	return 0;
 }
 
-static const luaL_reg lib[] = {
+static luaL_reg lib[] = {
 	{"set_frames", l_set_frames},
 	{"push_frame", l_push_frame},
 	{"save", l_save},
