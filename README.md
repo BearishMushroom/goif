@@ -1,6 +1,8 @@
 # goif
 A minimal gif-recoding library for LÖVE.
 
+![alt text](https://github.com/BearishMushroom/goif/blob/master/example.gif)
+
 ### Usage
 Drop `goif.lua` and the library files into your project and require it.
 ```lua
