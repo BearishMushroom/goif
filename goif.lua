@@ -17,7 +17,6 @@ goif.height = 0
 goif.data = {}
 
 local path = (...):match("(.-)[^%.]+$")
-path = path:gsub('(%.)', '\\')
 
 local libname = 'none'
 if love.system.getOS() == "Windows" then
@@ -28,9 +27,12 @@ if love.system.getOS() == "Windows" then
   else
     error("ERROR, UNSUPPORTED ARCH")
   end
+  path = path:gsub('(%.)', '\\')
+
 elseif love.system.getOS() == "Linux" then
   libname = 'libgoif.so'
-  path = './'
+  path = path:gsub('(%.)', '/')
+  path = path or './'
 end
 
 local lib = package.loadlib(path .. libname, 'luaopen_libgoif')
