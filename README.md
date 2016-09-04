@@ -60,7 +60,7 @@ function love.update(dt)
 end
 
 function love.draw()
-  goif.new_frame()
+  goif.start_frame()
   love.graphics.setColor(0, 0, 0)
   love.graphics.rectangle('fill', 0, 0, 800, 600)
   love.graphics.setColor(255, 255, 255)
