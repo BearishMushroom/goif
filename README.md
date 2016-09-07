@@ -19,8 +19,10 @@ There are two methods to actually record the frames.
 
 You'll need to use `goif.submit_frame()` if you use any `Canvas`'s in your rendering.
 
-#### `goif.start()`
+#### `goif.start([width, height])`
 Starts the gif recording.
+Unless specified, the width and height will be that of love.graphics.getWidth/Height
+If another size is specified, goif will expect canvases of width * height to be submitted via goif.submit_frame()
 
 #### `goif.stop([filename, verbose])`
 Exports the gif to `filename (default: gif.gif)` and overwrites it if the file already exists.
@@ -39,6 +41,8 @@ This will not work properly if you use `Canvas`'s' in your rendering.
 Use this if your rendering uses `Cavnas`'s.
 
 Submit the `Canvas` of your finished scene and goif will add it to the gif.
+
+If specified in goif.start(), the size of the canvas needs to match goif.width and goif.height.
 
 ## Warning!
 While recording, goif can use insane amounts of memory! This is all cleaned up after export, though.
