@@ -106,8 +106,10 @@ goif.end_frame = function()
 end
 
 goif.submit_frame = function(canvas)
-  goif.data[goif.frame + 1] = canvas:newImageData(0, 0, goif.width, goif.height)
-  goif.frame = goif.frame + 1
+  if goif.active then
+    goif.data[goif.frame + 1] = canvas:newImageData(0, 0, goif.width, goif.height)
+    goif.frame = goif.frame + 1
+  end
 end
 
 return goif
