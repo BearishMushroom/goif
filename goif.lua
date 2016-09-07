@@ -17,20 +17,29 @@ goif.height = 0
 goif.data = {}
 
 local path = (...):match("(.-)[^%.]+$")
-path = path:gsub('(%.)', '\\')
 
 local libname = 'none'
+
 if love.system.getOS() == "Windows" then
   if jit.arch == 'x86' then
     libname = 'libgoif_32.dll'
   elseif jit.arch == 'x64' then
     libname = 'libgoif_64.dll'
   else
-    error("ERROR, UNSUPPORTED ARCH")
+    error("GOIF: Unsupported CPU arch.")
   end
+  path = path:gsub('(%.)', '\\')
 elseif love.system.getOS() == "Linux" then
-  libname = 'libgoif.so'
-  path = './'
+  if jit.arch == 'x64' then
+    libname = 'libgoif.so'
+  else
+    error("GOIF: Unsupported CPU arch.")
+  end
+  path = './' .. path:gsub('(%.)', '/')
+end
+
+if libname == 'none' then
+  error("GOIF: Couldn't find proper library file for current OS.")
 end
 
 local lib = package.loadlib(path .. libname, 'luaopen_libgoif')
