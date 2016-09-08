@@ -20,6 +20,11 @@ local path = (...):match("(.-)[^%.]+$")
 
 local libname = 'none'
 
+local argPath = love.arg.options.game.arg[1]
+if argPath == '.' then
+  argPath = './'
+end
+
 if love.system.getOS() == "Windows" then
   if jit.arch == 'x86' then
     libname = 'libgoif_32.dll'
@@ -28,14 +33,14 @@ if love.system.getOS() == "Windows" then
   else
     error("GOIF: Unsupported CPU arch.")
   end
-  path = path:gsub('(%.)', '\\')
+  path = argPath .. path:gsub('(%.)', '/')
 elseif love.system.getOS() == "Linux" then
   if jit.arch == 'x64' then
     libname = 'libgoif.so'
   else
     error("GOIF: Unsupported CPU arch.")
   end
-  path = './' .. path:gsub('(%.)', '/')
+  path = './' .. argPath .. path:gsub('(%.)', '/')
 end
 
 if libname == 'none' then
