@@ -41,6 +41,13 @@ elseif love.system.getOS() == "Linux" then
     error("GOIF: Unsupported CPU arch.")
   end
   path = './' .. argPath .. path:gsub('(%.)', '/')
+elseif love.system.getOS() == "OS X" then
+  if jit.arch == 'x64' then
+    libname = "libgoif.dylib"
+  else
+    error("GOIF: Unsupported CPU arch.")
+  end
+  path = argPath .. path:gsub('(%.)', "/") .. '/'
 end
 
 if libname == 'none' then
